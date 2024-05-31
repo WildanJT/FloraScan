@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const predictClassification = require('../services/infereneService');
 
 
-const postPredictHandler = async (request, h) => {
+async function postPredictHandler(request, h) {
     const { image } = request.payload;
     const { model } = request.server.app;
 

@@ -27,8 +27,8 @@ const loadModel = require('../services/loadModel');
 
         if (response instanceof InputError) {
             const newResponse = h.response({
-                status: '',
-                message: ''
+                status: 'fail',
+                message: 'InputError'
             })
             newResponse.code(response.statusCode)
             return newResponse;
@@ -36,8 +36,8 @@ const loadModel = require('../services/loadModel');
 
         if (response.isBoom) {
             const newResponse = h.response({
-                status: '',
-                message: ''
+                status: 'fail',
+                message: 'isBoom'
             })
             newResponse.code(response.output.statusCode)
             return newResponse;
