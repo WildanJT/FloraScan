@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
 const routes = require('../server/routes');
-
+const InputError = require('../exceptions/InputError');
 const loadModel = require('../services/loadModel');
 
 
@@ -48,4 +48,5 @@ const loadModel = require('../services/loadModel');
 
     await server.start();
     console.log(`Server start at: ${server.info.uri}`);
-})
+    
+})();

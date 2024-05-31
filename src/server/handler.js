@@ -3,7 +3,7 @@ const { Firestore } = require('@google-cloud/firestore');
 
 const crypto = require('crypto');
 
-const predictClassification = require('../services/infereneService');
+const predictClassification = require('../services/inferenceService');
 
 
 async function postPredictHandler(request, h) {
