@@ -2,13 +2,15 @@ require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
 const routes = require('../server/routes');
+const mysql = require('mysql2/promise');
 const InputError = require('../exceptions/InputError');
+
 const loadModel = require('../services/loadModel');
 
 
 (async () => {
     const server = Hapi.server({
-        port: process.env.PORT || 3000,
+        port: process.env.PORT,
         host: 'localhost',
         routes: {
             cors: {
@@ -17,8 +19,21 @@ const loadModel = require('../services/loadModel');
         },
     });
 
-    const model = await loadModel();
-    server.app.model = model;
+    // Create MySQL connection pool
+    const pool = mysql.createPool({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+    });
+    // Add the pool to the server app context
+    server.app.pool = pool;
+
+    //const model = await loadModel();
+    //server.app.model = model;
 
     server.route(routes);
 
