@@ -1,4 +1,10 @@
-const { userRegisterHandler, userLoginHandler, userLogoutHandler, postPredictionHandler } = require('./handler');
+const { 
+    userRegisterHandler, 
+    userLoginHandler, 
+    userLogoutHandler, 
+    postPredictionHandler,
+    getPredictionHandler 
+} = require('./handler');
 
 const routes = [
     {
@@ -35,6 +41,11 @@ const routes = [
                 multipart: true,
             },*/
         }
+    },
+    {
+        path: '/prediction',
+        method: 'GET',
+        handler: getPredictionHandler
     }
 ]
 

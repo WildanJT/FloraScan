@@ -140,7 +140,36 @@ async function postPredictionHandler(request, h) {
         response.code(400);
         return response;
     }
-    
 }
 
-module.exports = { userRegisterHandler, userLoginHandler, userLogoutHandler, postPredictionHandler }
+async function getPredictionHandler(request, h) {
+    try {
+        const { pool } = request.server.app;
+        const { id } = request.auth.credentials;
+        const [data] = await pool.execute('SELECT id, prediction_data, timestamp FROM predictions WHERE user_id = ?', [id]);
+        
+        const response = h.response({
+            status: 'Success',
+            predictions: data
+        })
+        response.code(200);
+        return response;
+    }
+    catch(error) {
+        const response = h.response({
+            status: 'Fail',
+            message: 'Could not get predictions.'
+        })
+        response.code(400);
+        return response;
+
+    }
+}
+
+module.exports = { 
+    userRegisterHandler, 
+    userLoginHandler, 
+    userLogoutHandler, 
+    postPredictionHandler, 
+    getPredictionHandler 
+}
