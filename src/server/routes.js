@@ -1,26 +1,40 @@
-const { userRegisterHandler, userLoginHandler, postPredictHandler } = require('./handler');
+const { userRegisterHandler, userLoginHandler, userLogoutHandler, postPredictionHandler } = require('./handler');
 
 const routes = [
     {
         path: '/register',
         method: 'POST',
-        handler: userRegisterHandler
+        handler: userRegisterHandler,
+        options: {
+            auth: false
+        }
     },
     {
         path: '/login',
         method: 'POST',
-        handler: userLoginHandler
+        handler: userLoginHandler,
+        options: {
+            auth: false
+        }
     },
     {
-        path: '/predict',
+        path: '/logout',
         method: 'POST',
-        handler: postPredictHandler,
-        //options: {
-        //    payload: {
-        //        allow: 'multipart/form-data',
-        //        multipart: true,
-        //    }
-        //}
+        handler: userLogoutHandler,
+        options: {
+            auth: false
+        }
+    },
+    {
+        path: '/prediction',
+        method: 'POST',
+        handler: postPredictionHandler,
+        options: {
+            /*payload: {
+                allow: 'multipart/form-data',
+                multipart: true,
+            },*/
+        }
     }
 ]
 

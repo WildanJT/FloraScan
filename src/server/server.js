@@ -1,10 +1,13 @@
 require('dotenv').config();
 
 const Hapi = require('@hapi/hapi');
-const routes = require('../server/routes');
-const mysql = require('mysql2/promise');
-const InputError = require('../exceptions/InputError');
+const Cookie = require('@hapi/cookie');
+const Jwt = require('jsonwebtoken');
+const Boom = require('@hapi/boom');
+const Mysql = require('mysql2/promise');
 
+const InputError = require('../exceptions/InputError');
+const routes = require('../server/routes');
 const loadModel = require('../services/loadModel');
 
 
@@ -19,8 +22,47 @@ const loadModel = require('../services/loadModel');
         },
     });
 
+    // Register cookie plugin
+    await server.register(Cookie);
+
+    const isDevelopment = process.env.NODE_ENV === 'development';
+
+    // Configure cookie-based session
+    server.state('session', {
+        ttl: 24 * 60 * 60 * 1000, // 1 day lifetime
+        isSecure: !isDevelopment, // set to true at production
+        isHttpOnly: true,
+        encoding: 'base64json',
+        clearInvalid: true, // clear invalid cookie
+        strictHeader: true
+    });
+
+    server.auth.scheme('jwt', () => ({
+        authenticate: async (request, h) => {
+            const session = request.state.session;
+            if (!session || !session.token) {
+                throw Boom.unauthorized('Missing authentication');
+            }
+
+            try {
+                const decoded = Jwt.verify(session.token, process.env.JWT_SECRET);
+                return h.authenticated({ credentials: decoded });
+            }
+            catch(error) {
+                console.error('JWT Error:', error);
+                throw Boom.unauthorized('Invalid token');
+            }
+        }
+    }));
+
+    server.auth.strategy('jwt', 'jwt');
+    server.auth.default({
+        mode: 'optional',
+        strategy: 'jwt'
+    });
+
     // Create MySQL connection pool
-    const pool = mysql.createPool({
+    const pool = Mysql.createPool({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
@@ -29,17 +71,21 @@ const loadModel = require('../services/loadModel');
         connectionLimit: 10,
         queueLimit: 0,
     });
+    
     // Add the pool to the server app context
     server.app.pool = pool;
 
-    //const model = await loadModel();
-    //server.app.model = model;
+    /*
+    const model = await loadModel();
+    server.app.model = model;
+    */
 
     server.route(routes);
 
+    /*
     server.ext('onPreResponse', function (request, h) {
         const response = request.response;
-
+    
         if (response instanceof InputError) {
             const newResponse = h.response({
                 status: 'fail',
@@ -48,7 +94,7 @@ const loadModel = require('../services/loadModel');
             newResponse.code(response.statusCode)
             return newResponse;
         }
-
+    
         if (response.isBoom) {
             const newResponse = h.response({
                 status: 'fail',
@@ -57,9 +103,10 @@ const loadModel = require('../services/loadModel');
             newResponse.code(response.output.statusCode)
             return newResponse;
         }
-
+    
         return h.continue;
     });
+    */
 
     await server.start();
     console.log(`Server start at: ${server.info.uri}`);

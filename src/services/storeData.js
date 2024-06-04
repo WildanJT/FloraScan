@@ -1,5 +1,4 @@
 const mysql = require('mysql2/promise');
-const { Firestore } = require('@google-cloud/firestore');
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -10,12 +9,6 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0,
 });
-
-//async function storeData(id, data) {
-//    const db = new Firestore();
-//    const predictCollection = db.collection('predictions');
-//    return predictCollection.doc(id).set(data);
-//}
 
 // Store predictions into SQL database
 async function storeDataSQL(user_id, prediction_data) {

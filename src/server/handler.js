@@ -1,9 +1,8 @@
-const { storeData, storeDataSQL } = require('../services/storeData');
-const { Firestore } = require('@google-cloud/firestore');
-
 const crypto = require('crypto');
+const Jwt = require('jsonwebtoken');
 
 const predictClassification = require('../services/inferenceService');
+const { storeDataSQL } = require('../services/storeData');
 
 
 // Register new user
@@ -18,13 +17,15 @@ async function userRegisterHandler(request, h) {
         if (users.length === 0) {
             await pool.execute('INSERT INTO users (username, hashed_password) VALUE (?, ?)', [username, hashed_password])
             const response = h.response({
-                message: 'Data inserted successfully.'
+                status: 'Success',
+                message: 'Registered successfully.'
             })
             response.code(201);
             return response;
         }
         else{
             const response = h.response({
+                status: 'Fail',
                 message: 'Username is already taken.'
             })
             response.code(400);
@@ -34,7 +35,8 @@ async function userRegisterHandler(request, h) {
     catch(error) {
         console.error('Error inserting data: ', error);
         const response = h.response({
-            message: 'Error inserting data.'
+            status: 'Fail',
+            message: 'Failed to register.'
         })
         response.code(500);
         return response;
@@ -49,11 +51,19 @@ async function userLoginHandler(request, h) {
 
         const hashed_password = crypto.createHash('sha256').update(password).digest('hex');
 
-        const [rows] = await pool.execute('SELECT hashed_password FROM users WHERE username = ?', [username]);
+        const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
         if (rows.length >= 0) {
+            const userId = rows[0].id;
             const stored_password = rows[0].hashed_password;
             if (hashed_password === stored_password) {
-                return h.response({ status: 'Success', message: 'Login successful.' }).code(200);
+                const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+                const response = h.response({
+                    status: 'Success',
+                    message: 'Logged in successfully.'
+                })
+                response.state('session', { token });
+                response.code(200);
+                return response;
             }
             else {
                 return h.response({ status: 'Fail', message: 'Wrong password.' }).code(401);
@@ -65,33 +75,54 @@ async function userLoginHandler(request, h) {
             status: 'Fail',
             message: 'User not found.'
         })
-        response.code(400);
+        response.code(401);
+        return response;
+    }
+}
+
+// Logout
+async function userLogoutHandler(request, h) {
+    try {
+        const response = h.response({
+            status: 'Success',
+            message: 'Logged out successfully.'
+        })
+        response.unstate('session');
+        response.code(200);
+        return response;
+    }
+    catch(error) {
+        const response = h.response({
+            status: 'Fail',
+            message: 'Unable to unstate session.'
+        })
+        response.code(500);
         return response;
     }
 }
 
 // Prediction
-async function postPredictHandler(request, h) {
+async function postPredictionHandler(request, h) {
     try {
-        const { pool } = request.server.app;
-        const { prediction_data } = request.payload; // test only
-        const label = prediction_data // test only
+        const { prediction_data } = request.payload; // needed for test only, should be deleted after
+        const label = prediction_data // needed for test only, should be deleted after
 
-        //const { model } = request.server.app;
-        //const { confidenceScore, label, suggestion } = await predictClassification(model, image);
+        /*
+        // need machine learning model to pass this section
+        const { model } = request.server.app;
+        const { confidenceScore, label, suggestion } = await predictClassification(model, image);
 
-        //const data = {
-        //    prediction: label
-        //    score: confidenceScore
-        //}
+        const data = {
+            prediction: label,
+            score: confidenceScore,
+            suggestion: suggestion
+        }
+        */
+        
+        // geting user id through authenticated credentials
+        const  { id } = request.auth.credentials;
 
-        const secretKey = 'wildan' // need to be change for each session
-
-        const [rows] = await pool.execute('SELECT id FROM users WHERE username = ?', [secretKey]);
-        const user_id = rows[0].id;
-
-        //await storeData(id, data);
-        await storeDataSQL(user_id, label);
+        await storeDataSQL(id, label);
 
         const response = h.response({
             status: 'Success',
@@ -112,4 +143,4 @@ async function postPredictHandler(request, h) {
     
 }
 
-module.exports = { userRegisterHandler, userLoginHandler, postPredictHandler }
+module.exports = { userRegisterHandler, userLoginHandler, userLogoutHandler, postPredictionHandler }
