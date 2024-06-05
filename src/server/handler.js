@@ -5,7 +5,7 @@ const predictClassification = require('../services/inferenceService');
 const { storeDataSQL } = require('../services/storeData');
 
 
-// Register new user
+// Registering new user
 async function userRegisterHandler(request, h) {
     try {
         const { pool } = request.server.app;
@@ -13,8 +13,10 @@ async function userRegisterHandler(request, h) {
 
         const hashed_password = crypto.createHash('sha256').update(password).digest('hex');
 
+        // Checking if the given username already exist in database
         const [users] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
         if (users.length === 0) {
+            // Inserting user credentials into database
             await pool.execute('INSERT INTO users (username, hashed_password) VALUE (?, ?)', [username, hashed_password])
             const response = h.response({
                 status: 'Success',
@@ -43,7 +45,7 @@ async function userRegisterHandler(request, h) {
     }
 }
 
-// Login
+// Logging in
 async function userLoginHandler(request, h) {
     try {
         const { pool } = request.server.app;
@@ -51,16 +53,20 @@ async function userLoginHandler(request, h) {
 
         const hashed_password = crypto.createHash('sha256').update(password).digest('hex');
 
+        // Verifying user login credentials with the one from database
         const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
         if (rows.length >= 0) {
             const userId = rows[0].id;
             const stored_password = rows[0].hashed_password;
+            // Authenticating credentials
             if (hashed_password === stored_password) {
-                const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+                // Creating a token for the user consist of user id and username
+                const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
                 const response = h.response({
                     status: 'Success',
                     message: 'Logged in successfully.'
                 })
+                // Creating session with the token
                 response.state('session', { token });
                 response.code(200);
                 return response;
@@ -80,13 +86,14 @@ async function userLoginHandler(request, h) {
     }
 }
 
-// Logout
+// Logging out
 async function userLogoutHandler(request, h) {
     try {
         const response = h.response({
             status: 'Success',
             message: 'Logged out successfully.'
         })
+        // Clearing session
         response.unstate('session');
         response.code(200);
         return response;
@@ -101,14 +108,26 @@ async function userLogoutHandler(request, h) {
     }
 }
 
-// Prediction
+// Posting a Prediction
 async function postPredictionHandler(request, h) {
     try {
         const { prediction_data } = request.payload; // needed for test only, should be deleted after
-        const label = prediction_data // needed for test only, should be deleted after
+        const data = prediction_data // needed for test only, should be deleted after
 
-        /*
-        // need machine learning model to pass this section
+        /* need machine learning model to pass this section
+        // Getting image from the request
+        const { image } = request.payload;
+        const filename = image.hapi.filename;
+        const mime_type = image.hapi.headers['content-type'];
+
+        // Reading the image content
+        const imageBuffer = await new Promise((resolve, reject) => {
+            const chunks = [];
+            image.on('data', chunk => chunks.push(chunk));
+            image.on('end', () => resolve(Buffer.concat(chunks)));
+            image.on('error', err => reject(err));
+        });
+
         const { model } = request.server.app;
         const { confidenceScore, label, suggestion } = await predictClassification(model, image);
 
@@ -119,10 +138,10 @@ async function postPredictionHandler(request, h) {
         }
         */
         
-        // geting user id through authenticated credentials
+        // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
 
-        await storeDataSQL(id, label);
+        await storeDataSQL(id, data/*, imageBuffer, filename, mime_type */);
 
         const response = h.response({
             status: 'Success',
@@ -142,6 +161,7 @@ async function postPredictionHandler(request, h) {
     }
 }
 
+// Getting predictions history
 async function getPredictionHandler(request, h) {
     try {
         const { pool } = request.server.app;
