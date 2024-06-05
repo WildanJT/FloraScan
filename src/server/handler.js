@@ -111,10 +111,8 @@ async function userLogoutHandler(request, h) {
 // Posting a Prediction
 async function postPredictionHandler(request, h) {
     try {
-        const { prediction_data } = request.payload; // needed for test only, should be deleted after
-        const data = prediction_data // needed for test only, should be deleted after
+        const data = 'sample-data-image' // needed for test only, should be deleted after
 
-        /* need machine learning model to pass this section
         // Getting image from the request
         const { image } = request.payload;
         const filename = image.hapi.filename;
@@ -128,6 +126,7 @@ async function postPredictionHandler(request, h) {
             image.on('error', err => reject(err));
         });
 
+        /*
         const { model } = request.server.app;
         const { confidenceScore, label, suggestion } = await predictClassification(model, image);
 
@@ -141,12 +140,12 @@ async function postPredictionHandler(request, h) {
         // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
 
-        await storeDataSQL(id, data/*, imageBuffer, filename, mime_type */);
+        await storeDataSQL(id, data, imageBuffer, filename, mime_type);
 
         const response = h.response({
             status: 'Success',
             message: 'Prediction successful.',
-            //data
+            data: data
         })
         response.code(201);
         return response;
@@ -166,7 +165,7 @@ async function getPredictionHandler(request, h) {
     try {
         const { pool } = request.server.app;
         const { id } = request.auth.credentials;
-        const [data] = await pool.execute('SELECT id, prediction_data, timestamp FROM predictions WHERE user_id = ?', [id]);
+        const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.timestamp, images.file_name FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ?', [id]);
         
         const response = h.response({
             status: 'Success',

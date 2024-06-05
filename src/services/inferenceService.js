@@ -20,24 +20,24 @@ async function predictClassification(model, image) {
 
         let suggestion;
 
-        if (label === 'Healthy') {
-            suggestion = " "
-        }
-    
-        if (label === 'Virus') {
-            suggestion = " "
-        }
-
-        if (label === 'Fungal') {
-            suggestion = " "
-        }
-    
-        if (label === 'Hama') {
-            suggestion = " "
-        }
-
         if (label === 'Bacterial') {
-            suggestion = " "
+            suggestion = "0 "
+        }
+    
+        if (label === 'Fungal') {
+            suggestion = "1 "
+        }
+
+        if (label === 'Hama') {
+            suggestion = "2 "
+        }
+    
+        if (label === 'Healthy') {
+            suggestion = "3 "
+        }
+
+        if (label === 'Virus') {
+            suggestion = "4 "
         }
 
         return { confidenceScore, label, suggestion };
