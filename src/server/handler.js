@@ -111,8 +111,6 @@ async function userLogoutHandler(request, h) {
 // Posting a Prediction
 async function postPredictionHandler(request, h) {
     try {
-        const data = 'sample-data-image' // needed for test only, should be deleted after
-
         // Getting image from the request
         const { image } = request.payload;
         const filename = image.hapi.filename;
@@ -126,26 +124,24 @@ async function postPredictionHandler(request, h) {
             image.on('error', err => reject(err));
         });
 
-        /*
         const { model } = request.server.app;
-        const { confidenceScore, label, suggestion } = await predictClassification(model, image);
+        const { confidenceScore, label, suggestion } = await predictClassification(model, imageBuffer);
 
         const data = {
             prediction: label,
             score: confidenceScore,
             suggestion: suggestion
-        }
-        */
+        };
         
         // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
 
-        await storeDataSQL(id, data, imageBuffer, filename, mime_type);
+        await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, mime_type);
 
         const response = h.response({
             status: 'Success',
             message: 'Prediction successful.',
-            data: data
+            result: data
         })
         response.code(201);
         return response;

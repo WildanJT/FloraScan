@@ -4,7 +4,7 @@ const InputError = require('../exceptions/InputError');
 async function predictClassification(model, image) {
     try {
         const tensor = tf.node
-        .decodeJpeg(image)
+        .decodeImage(image)
         .resizeNearestNeighbor([224, 224])
         .expandDims()
         .toFloat()

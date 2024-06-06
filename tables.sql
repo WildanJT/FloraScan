@@ -8,6 +8,7 @@ CREATE TABLE predictions (
 id INT AUTO_INCREMENT PRIMARY KEY,
 user_id INT,
 prediction_data VARCHAR(255) NOT NULL,
+prediction_score INT,
 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

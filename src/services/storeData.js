@@ -11,9 +11,9 @@ const pool = mysql.createPool({
 });
 
 // Store predictions into SQL database
-async function storeDataSQL(user_id, prediction_data, image_data, file_name, mime_type) {
+async function storeDataSQL(user_id, prediction_data, confidence_score, image_data, file_name, mime_type) {
     // Storing prediction data
-    await pool.execute('INSERT INTO predictions (user_id, prediction_data) VALUES (?, ?)', [user_id, prediction_data]);
+    await pool.execute('INSERT INTO predictions (user_id, prediction_data, prediction_score) VALUES (?, ?, ?)', [user_id, prediction_data, confidence_score]);
     
     // Storing prediction image
     const [result] = await pool.execute('SELECT id FROM predictions ORDER BY id DESC');
