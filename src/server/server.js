@@ -28,7 +28,7 @@ const loadModel = require('../services/loadModel');
     // Configure cookie-based session
     server.state('session', {
         ttl: 24 * 60 * 60 * 1000, // 1 day lifetime
-        isSecure: false,
+        isSecure: process.env.NODE_ENV !== 'development' ? true : false, // true in production
         isHttpOnly: true,
         encoding: 'base64json',
         clearInvalid: true, // clear invalid cookie

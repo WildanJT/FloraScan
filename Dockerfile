@@ -1,10 +1,10 @@
 # Parent image
-FROM node:20
+FROM node:20.13.1
 
 # Set environtment variables
-ENV PORT= 3000
+ENV PORT=3000
 
-ENV MODEL_URL= https://storage.googleapis.com/florascan-model-bucket/tfjs-model/model.json
+ENV MODEL_URL=https://storage.googleapis.com/florascan-model-bucket/tfjs-model/model.json
 
 # Create and change to the app directory
 WORKDIR /usr/src/app

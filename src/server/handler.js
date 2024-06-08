@@ -4,31 +4,58 @@ const Jwt = require('jsonwebtoken');
 const predictClassification = require('../services/inferenceService');
 const { storeDataSQL } = require('../services/storeData');
 
+const isValidEmail = (email) => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+};
 
 // Registering new user
 async function userRegisterHandler(request, h) {
     try {
         const { pool } = request.server.app;
-        const { username, password} = request.payload;
+        const { email, username, password} = request.payload;
 
         const hashed_password = crypto.createHash('sha256').update(password).digest('hex');
 
-        // Checking if the given username already exist in database
-        const [users] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
-        if (users.length === 0) {
-            // Inserting user credentials into database
-            await pool.execute('INSERT INTO users (username, hashed_password) VALUE (?, ?)', [username, hashed_password])
-            const response = h.response({
-                status: 'Success',
-                message: 'Registered successfully.'
-            })
-            response.code(201);
-            return response;
+        // Checking email format
+        if (isValidEmail(email)) {
+            // Checking if the given email already exist in database
+            const [emails] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
+            if (emails.length === 0) {
+                // Checking if the given username already exist in database
+                const [users] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
+                if (users.length === 0) {
+                    // Inserting user credentials into database
+                    await pool.execute('INSERT INTO users (email, username, hashed_password) VALUE (?, ?, ?)', [email, username, hashed_password])
+                    const response = h.response({
+                        status: 'Success',
+                        message: 'Registered successfully.'
+                    })
+                response.code(201);
+                return response;
+                }
+                else{
+                    const response = h.response({
+                        status: 'Fail',
+                        message: 'Username is already taken.'
+                    })
+                    response.code(400);
+                    return response;
+                }
+            }
+            else{
+                const response = h.response({
+                    status: 'Fail',
+                    message: 'Email is already taken.'
+                })
+                response.code(400);
+                return response;
+            }
         }
         else{
             const response = h.response({
                 status: 'Fail',
-                message: 'Username is already taken.'
+                message: 'Please use a valid email address.'
             })
             response.code(400);
             return response;
@@ -49,30 +76,58 @@ async function userRegisterHandler(request, h) {
 async function userLoginHandler(request, h) {
     try {
         const { pool } = request.server.app;
-        const { username, password} = request.payload;
+        const { emailOrUsername, password} = request.payload;
 
         const hashed_password = crypto.createHash('sha256').update(password).digest('hex');
 
-        // Verifying user login credentials with the one from database
-        const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [username]);
-        if (rows.length >= 0) {
-            const userId = rows[0].id;
-            const stored_password = rows[0].hashed_password;
-            // Authenticating credentials
-            if (hashed_password === stored_password) {
-                // Creating a token for the user consist of user id and username
-                const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
-                const response = h.response({
-                    status: 'Success',
-                    message: 'Logged in successfully.'
-                })
-                // Creating session with the token
-                response.state('session', { token });
-                response.code(200);
-                return response;
+        if (isValidEmail(emailOrUsername)) {
+            // Verifying user login credentials with the one from database
+            const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [emailOrUsername]);
+            if (rows.length >= 0) {
+                const userId = rows[0].id;
+                const username = rows[0].username;
+                const stored_password = rows[0].hashed_password;
+                // Authenticating credentials
+                if (hashed_password === stored_password) {
+                    // Creating a token for the user consist of user id and username
+                    const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
+                    const response = h.response({
+                        status: 'Success',
+                        message: 'Logged in successfully.'
+                    })
+                    // Creating session with the token
+                    response.state('session', { token });
+                    response.code(200);
+                    return response;
+                }
+                else {
+                    return h.response({ status: 'Fail', message: 'Wrong password.' }).code(401);
+                }
             }
-            else {
-                return h.response({ status: 'Fail', message: 'Wrong password.' }).code(401);
+        }
+        else {
+            // Verifying user login credentials with the one from database
+            const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [emailOrUsername]);
+            if (rows.length >= 0) {
+                const userId = rows[0].id;
+                const username = rows[0].username;
+                const stored_password = rows[0].hashed_password;
+                // Authenticating credentials
+                if (hashed_password === stored_password) {
+                    // Creating a token for the user consist of user id and username
+                    const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
+                    const response = h.response({
+                        status: 'Success',
+                        message: 'Logged in successfully.'
+                    })
+                    // Creating session with the token
+                    response.state('session', { token });
+                    response.code(200);
+                    return response;
+                }
+                else {
+                    return h.response({ status: 'Fail', message: 'Wrong password.' }).code(401);
+                }
             }
         }
     }
