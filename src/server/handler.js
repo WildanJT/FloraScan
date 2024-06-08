@@ -5,6 +5,7 @@ const predictClassification = require('../services/inferenceService');
 const { storeDataSQL } = require('../services/storeData');
 
 const isValidEmail = (email) => {
+    // Formated as string@string.string
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
 };
@@ -31,8 +32,8 @@ async function userRegisterHandler(request, h) {
                         status: 'Success',
                         message: 'Registered successfully.'
                     })
-                response.code(201);
-                return response;
+                    response.code(201);
+                    return response;
                 }
                 else{
                     const response = h.response({
