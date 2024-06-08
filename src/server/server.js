@@ -14,7 +14,7 @@ const loadModel = require('../services/loadModel');
 (async () => {
     const server = Hapi.server({
         port: process.env.PORT,
-        host: 'localhost',
+        host: process.env.NODE_ENV === 'development' ? 'localhost' : '0.0.0.0',
         routes: {
             cors: {
                 origin: ['*'],
@@ -25,12 +25,10 @@ const loadModel = require('../services/loadModel');
     // Register cookie plugin
     await server.register(Cookie);
 
-    const isDevelopment = process.env.NODE_ENV === 'development';
-
     // Configure cookie-based session
     server.state('session', {
         ttl: 24 * 60 * 60 * 1000, // 1 day lifetime
-        isSecure: !isDevelopment, // set to true at production
+        isSecure: false,
         isHttpOnly: true,
         encoding: 'base64json',
         clearInvalid: true, // clear invalid cookie
