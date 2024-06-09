@@ -3,10 +3,10 @@ require('dotenv').config();
 const Hapi = require('@hapi/hapi');
 const Cookie = require('@hapi/cookie');
 const Jwt = require('jsonwebtoken');
-const Boom = require('@hapi/boom');
 const Mysql = require('mysql2/promise');
 
-const InputError = require('../exceptions/InputError');
+const Boom = require('@hapi/boom');
+
 const routes = require('../server/routes');
 const loadModel = require('../services/loadModel');
 
@@ -73,38 +73,12 @@ const loadModel = require('../services/loadModel');
     // Add the pool to the server app context
     server.app.pool = pool;
 
+    // Load machine learning model
     const model = await loadModel();
     server.app.model = model;    
 
     server.route(routes);
 
-    /*
-    server.ext('onPreResponse', function (request, h) {
-        const response = request.response;
-    
-        if (response instanceof InputError) {
-            const newResponse = h.response({
-                status: 'fail',
-                message: 'InputError'
-            })
-            newResponse.code(response.statusCode)
-            return newResponse;
-        }
-    
-        if (response.isBoom) {
-            const newResponse = h.response({
-                status: 'fail',
-                message: 'isBoom'
-            })
-            newResponse.code(response.output.statusCode)
-            return newResponse;
-        }
-    
-        return h.continue;
-    });
-    */
-
     await server.start();
     console.log(`Server start at: ${server.info.uri}`);
-    
 })();

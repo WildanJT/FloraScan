@@ -3,7 +3,8 @@ const {
     userLoginHandler, 
     userLogoutHandler, 
     postPredictionHandler,
-    getPredictionHandler 
+    getPredictionHandler, 
+    deletePredictionHandler
 } = require('./handler');
 
 const routes = [
@@ -49,6 +50,11 @@ const routes = [
         path: '/prediction',
         method: 'GET',
         handler: getPredictionHandler
+    },
+    {
+        path: '/prediction',
+        method: 'DELETE',
+        handler: deletePredictionHandler
     }
 ]
 

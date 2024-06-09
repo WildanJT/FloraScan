@@ -66,7 +66,7 @@ async function userRegisterHandler(request, h) {
         console.error('Error inserting data: ', error);
         const response = h.response({
             status: 'Fail',
-            message: 'Failed to register.'
+            message: error.message
         })
         response.code(500);
         return response;
@@ -84,7 +84,7 @@ async function userLoginHandler(request, h) {
         if (isValidEmail(emailOrUsername)) {
             // Verifying user login credentials with the one from database
             const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [emailOrUsername]);
-            if (rows.length >= 0) {
+            if (rows.length > 0) {
                 const userId = rows[0].id;
                 const username = rows[0].username;
                 const stored_password = rows[0].hashed_password;
@@ -102,14 +102,17 @@ async function userLoginHandler(request, h) {
                     return response;
                 }
                 else {
-                    return h.response({ status: 'Fail', message: 'Wrong password.' }).code(401);
+                    return h.response({ status: 'Fail', message: 'Wrong password.' }).code(400);
                 }
+            }
+            else {
+                return h.response({ status: 'Fail', message: 'No user data found.' }).code(400);
             }
         }
         else {
             // Verifying user login credentials with the one from database
             const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [emailOrUsername]);
-            if (rows.length >= 0) {
+            if(rows.length > 0) {
                 const userId = rows[0].id;
                 const username = rows[0].username;
                 const stored_password = rows[0].hashed_password;
@@ -127,17 +130,20 @@ async function userLoginHandler(request, h) {
                     return response;
                 }
                 else {
-                    return h.response({ status: 'Fail', message: 'Wrong password.' }).code(401);
+                    return h.response({ status: 'Fail', message: 'Wrong password.' }).code(400);
                 }
+            }
+            else {
+                return h.response({ status: 'Fail', message: 'No user data found.' }).code(400);
             }
         }
     }
     catch(error) {
         const response = h.response({
             status: 'Fail',
-            message: 'User not found.'
+            message: error.message
         })
-        response.code(401);
+        response.code(500);
         return response;
     }
 }
@@ -157,7 +163,7 @@ async function userLogoutHandler(request, h) {
     catch(error) {
         const response = h.response({
             status: 'Fail',
-            message: 'Unable to unstate session.'
+            message: error.message
         })
         response.code(500);
         return response;
@@ -180,6 +186,12 @@ async function postPredictionHandler(request, h) {
             image.on('error', err => reject(err));
         });
 
+        // Convert the binary data to a Buffer
+        const buffer = Buffer.from(imageBuffer, 'binary');
+
+        // Encode the Buffer as a Base64 string
+        const image_encoded = buffer.toString('base64');
+
         const { model } = request.server.app;
         const { confidenceScore, label, suggestion } = await predictClassification(model, imageBuffer);
 
@@ -192,7 +204,7 @@ async function postPredictionHandler(request, h) {
         // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
 
-        await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, mime_type);
+        await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, image_encoded, mime_type);
 
         const response = h.response({
             status: 'Success',
@@ -205,9 +217,9 @@ async function postPredictionHandler(request, h) {
     catch(error) {
         const response = h.response({
             status: 'Fail',
-            message: 'Could not predict image.'
+            message: error.message
         })
-        response.code(400);
+        response.code(500);
         return response;
     }
 }
@@ -217,7 +229,7 @@ async function getPredictionHandler(request, h) {
     try {
         const { pool } = request.server.app;
         const { id } = request.auth.credentials;
-        const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.timestamp, images.file_name FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ?', [id]);
+        const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ?', [id]);
         
         const response = h.response({
             status: 'Success',
@@ -229,11 +241,41 @@ async function getPredictionHandler(request, h) {
     catch(error) {
         const response = h.response({
             status: 'Fail',
-            message: 'Could not get predictions.'
+            message: error.message
         })
-        response.code(400);
+        response.code(500);
         return response;
 
+    }
+}
+
+// Deleting prediction history
+async function deletePredictionHandler(request, h) {
+    try {
+        const { pool } = request.server.app;
+        const { predictionId } = request.query;
+        const { id } = request.auth.credentials;
+        const [rows] = await pool.execute('SELECT * FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id])
+        if (rows.length > 0) {
+            await pool.execute('DELETE FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id]);
+            const response = h.response({
+                status: 'Success',
+                message: 'Prediction deleted.'
+            })
+            response.code(200);
+            return response;
+        }
+        else {
+            return h.response({ status: 'Fail', message: 'Couldn\'t find prediction.' }).code(400);
+        }
+    }
+    catch(error) {
+        const response = h.response({
+            status: 'Fail',
+            message: error.message
+        })
+        response.code(500);
+        return response;
     }
 }
 
@@ -242,5 +284,6 @@ module.exports = {
     userLoginHandler, 
     userLogoutHandler, 
     postPredictionHandler, 
-    getPredictionHandler 
+    getPredictionHandler, 
+    deletePredictionHandler, 
 }

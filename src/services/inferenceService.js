@@ -43,7 +43,7 @@ async function predictClassification(model, image) {
         return { confidenceScore, label, suggestion };
     } 
     catch (error) {
-        throw new InputError(`Terjadi kesalahan input: ${error.message}`);
+        throw new InputError(`Input error: ${error.message}`);
     }
 }
 
