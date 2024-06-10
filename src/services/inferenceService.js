@@ -1,5 +1,24 @@
 const tf = require('@tensorflow/tfjs-node');
+const { Firestore } = require('@google-cloud/firestore');
+
 const InputError = require('../exceptions/InputError');
+
+async function requestSuggestion(label) {
+    try {
+        const firestoreDB = new Firestore({
+            projectId: process.env.PROJECT_ID,
+        });
+        const suggestionCollection = firestoreDB.collection('suggestions').doc(label);
+        const suggestionDoc = await suggestionCollection.get();
+        
+        const result = suggestionDoc.data()['suggestion'];
+
+        return result;
+    }
+    catch(error) {
+        console.log('Fail to request suggestion: ', error.message);
+    }
+}
 
 async function predictClassification(model, image) {
     try {
@@ -18,32 +37,12 @@ async function predictClassification(model, image) {
         const classResult = tf.argMax(prediction, 1).dataSync()[0];
         const label = classes[classResult];
 
-        let suggestion;
-
-        if (label === 'Bacterial') {
-            suggestion = "0 "
-        }
-    
-        if (label === 'Fungal') {
-            suggestion = "1 "
-        }
-
-        if (label === 'Hama') {
-            suggestion = "2 "
-        }
-    
-        if (label === 'Healthy') {
-            suggestion = "3 "
-        }
-
-        if (label === 'Virus') {
-            suggestion = "4 "
-        }
+        const suggestion = await requestSuggestion(label);
 
         return { confidenceScore, label, suggestion };
     } 
     catch (error) {
-        throw new InputError(`Input error: ${error.message}`);
+        throw new InputError(`Error: ${error.message}`);
     }
 }
 
