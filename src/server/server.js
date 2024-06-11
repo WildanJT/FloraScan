@@ -73,9 +73,11 @@ const loadModel = require('../services/loadModel');
     // Add the pool to the server app context
     server.app.pool = pool;
 
+    /*
     // Load machine learning model
     const model = await loadModel();
-    server.app.model = model;    
+    server.app.model = model;   
+    */ 
 
     server.route(routes);
 

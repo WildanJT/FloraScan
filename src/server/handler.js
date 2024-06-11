@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const Jwt = require('jsonwebtoken');
 
+const forwardToFlask = require('../services/forwardRequest');
 const predictClassification = require('../services/inferenceService');
 const { storeDataSQL } = require('../services/storeData');
 
@@ -47,7 +48,7 @@ async function userRegisterHandler(request, h) {
             else{
                 const response = h.response({
                     status: 'Fail',
-                    message: 'Email is already taken.'
+                    message: 'Email is already registered.'
                 })
                 response.code(400);
                 return response;
@@ -192,6 +193,7 @@ async function postPredictionHandler(request, h) {
         // Encode the Buffer as a Base64 string
         const image_encoded = buffer.toString('base64');
 
+        /*
         const { model } = request.server.app;
         const { confidenceScore, label, suggestion } = await predictClassification(model, imageBuffer);
 
@@ -200,7 +202,17 @@ async function postPredictionHandler(request, h) {
             score: confidenceScore,
             suggestion: suggestion
         };
-        
+        */
+
+        // Forward the request to the Flask server
+        const flask_data = await forwardToFlask(image, filename);
+
+        const data = {
+            prediction: flask_data.prediction_class,
+            score: flask_data.confidence_score,
+            suggestion: 'await suggestion function'
+        }
+
         // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
 
