@@ -1,9 +1,12 @@
 const crypto = require('crypto');
-const Jwt = require('jsonwebtoken');
+const FormData = require('form-data');
 
-const forwardToFlask = require('../services/forwardRequest');
-const predictClassification = require('../services/inferenceService');
+const Jwt = require('jsonwebtoken');
+const axios = require('axios');
+
+const { requestSuggestion } = require('../services/giveSuggestion');
 const { storeDataSQL } = require('../services/storeData');
+
 
 const isValidEmail = (email) => {
     // Formated as string@string.string
@@ -16,6 +19,15 @@ async function userRegisterHandler(request, h) {
     try {
         const { pool } = request.server.app;
         const { email, username, password} = request.payload;
+
+        if (!email||!username||!password) {
+            const response = h.response({
+                status: 'Fail',
+                message: 'Please fill out all the requirements.'
+            })
+            response.code(400);
+            return response;
+        }
 
         const hashed_password = crypto.createHash('sha256').update(password).digest('hex');
 
@@ -174,10 +186,41 @@ async function userLogoutHandler(request, h) {
 // Posting a Prediction
 async function postPredictionHandler(request, h) {
     try {
+        const payload = request.payload;
+                
+        // Check if 'image' key exists in the payload
+        if (!payload || !payload.image) {
+            throw Boom.badRequest('Image file is required');
+        }
+
         // Getting image from the request
-        const { image } = request.payload;
+        const image = payload.image;
         const filename = image.hapi.filename;
         const mime_type = image.hapi.headers['content-type'];
+
+
+        // Append the image into request form
+        const form = new FormData();
+        form.append('image', image._data, {
+            filename: filename,
+            contentType: mime_type
+        });
+
+        // Forward the request form to the Flask server
+        const flask_response = await axios.post(process.env.FLASK_URL, form, {
+            headers: {
+                'Content-Type': `multipart/form-data; boundary=${form._boundary}`
+            }
+        });
+
+        // Picking up the data receive from Flask server
+        const flask_data = flask_response.data;
+        const { predicted_class, confidence_score } = flask_data;
+        const data = {
+            prediction: predicted_class,
+            score: confidence_score*100,
+            suggestion: await requestSuggestion(predicted_class)
+        }
 
         // Reading the image content
         const imageBuffer = await new Promise((resolve, reject) => {
@@ -203,16 +246,7 @@ async function postPredictionHandler(request, h) {
             suggestion: suggestion
         };
         */
-
-        // Forward the request to the Flask server
-        const flask_data = await forwardToFlask(image, filename);
-
-        const data = {
-            prediction: flask_data.prediction_class,
-            score: flask_data.confidence_score,
-            suggestion: 'await suggestion function'
-        }
-
+        
         // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
 
@@ -257,7 +291,6 @@ async function getPredictionHandler(request, h) {
         })
         response.code(500);
         return response;
-
     }
 }
 

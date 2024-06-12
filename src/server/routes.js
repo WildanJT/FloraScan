@@ -9,11 +9,21 @@ const {
 
 const routes = [
     {
+        path: '/',
+        method: 'GET',
+        handler: (request, h) => {
+            return ('<h1>FloraScan is Running<h1>');
+        },
+        options: {
+            auth: false,
+        }
+    },
+    {
         path: '/register',
         method: 'POST',
         handler: userRegisterHandler,
         options: {
-            auth: false
+            auth: false,
         }
     },
     {
@@ -21,15 +31,15 @@ const routes = [
         method: 'POST',
         handler: userLoginHandler,
         options: {
-            auth: false
+            auth: false,
         }
     },
     {
         path: '/logout',
-        method: 'POST',
+        method: '*',
         handler: userLogoutHandler,
         options: {
-            auth: false
+            auth: false,
         }
     },
     {
@@ -40,9 +50,9 @@ const routes = [
             payload: {
                 output: 'stream',
                 parse: true,
+                multipart: true,
                 allow: 'multipart/form-data',
                 maxBytes: 2 * 1024 * 1024, // 2MB file size limit
-                multipart: true,
             }
         }
     },

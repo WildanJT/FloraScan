@@ -8,7 +8,6 @@ const Mysql = require('mysql2/promise');
 const Boom = require('@hapi/boom');
 
 const routes = require('../server/routes');
-const loadModel = require('../services/loadModel');
 
 
 (async () => {
@@ -22,8 +21,15 @@ const loadModel = require('../services/loadModel');
         },
     });
 
-    // Register cookie plugin
-    await server.register(Cookie);
+    // Register plugins
+    await server.register([
+        {
+            plugin: Cookie,
+            options: {
+                enabledByDefault: true
+            }
+        },
+    ]);
 
     // Configure cookie-based session
     server.state('session', {
@@ -73,14 +79,8 @@ const loadModel = require('../services/loadModel');
     // Add the pool to the server app context
     server.app.pool = pool;
 
-    /*
-    // Load machine learning model
-    const model = await loadModel();
-    server.app.model = model;   
-    */ 
-
     server.route(routes);
 
     await server.start();
-    console.log(`Server start at: ${server.info.uri}`);
+    console.log(`Server start at: ${server.info.uri}/`);
 })();
