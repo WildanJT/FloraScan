@@ -235,17 +235,6 @@ async function postPredictionHandler(request, h) {
 
         // Encode the Buffer as a Base64 string
         const image_encoded = buffer.toString('base64');
-
-        /*
-        const { model } = request.server.app;
-        const { confidenceScore, label, suggestion } = await predictClassification(model, imageBuffer);
-
-        const data = {
-            prediction: label,
-            score: confidenceScore,
-            suggestion: suggestion
-        };
-        */
         
         // Getting user credentials through the authentication
         const  { id } = request.auth.credentials;
