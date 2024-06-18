@@ -3,6 +3,7 @@ require('dotenv').config();
 const Hapi = require('@hapi/hapi');
 const Cookie = require('@hapi/cookie');
 const Jwt = require('jsonwebtoken');
+const Jwt2 = require('hapi-auth-jwt2');
 const Mysql = require('mysql2/promise');
 
 const Boom = require('@hapi/boom');
@@ -23,14 +24,21 @@ const routes = require('../server/routes');
 
     // Register plugins
     await server.register([
-        {
+        /*{
             plugin: Cookie,
+            options: {
+                enabledByDefault: true
+            }
+        },*/
+        {
+            plugin: Jwt2,
             options: {
                 enabledByDefault: true
             }
         },
     ]);
 
+    /*
     // Configure cookie-based session
     server.state('session', {
         ttl: 24 * 60 * 60 * 1000, // 1 day lifetime
@@ -48,18 +56,32 @@ const routes = require('../server/routes');
                 throw Boom.unauthorized('Missing authentication');
             }
 
-            try {
-                const decoded = Jwt.verify(session.token, process.env.JWT_SECRET);
-                return h.authenticated({ credentials: decoded });
+            if (session) {
+                try {
+                    decoded = Jwt.verify(session.token, process.env.JWT_SECRET);
+                    return h.authenticated({ credentials: decoded });
+                }
+                catch(error) {
+                    console.error('JWT Error:', error);
+                    throw Boom.unauthorized('Invalid token');
+                }
             }
-            catch(error) {
-                console.error('JWT Error:', error);
-                throw Boom.unauthorized('Invalid token');
-            }
+            
         }
-    }));
+    }));*/
 
-    server.auth.strategy('jwt', 'jwt');
+    const validate = async (decoded, request, h) => {
+        if(!decoded.id) {
+            return { isValid: false };
+        }
+        return { isValid: true, credentials: decoded };
+    }
+
+    server.auth.strategy('jwt', 'jwt', {
+        key: process.env.JWT_SECRET,
+        validate,
+        verifyOptions: { algorithms: ['HS256'] },
+    });
     server.auth.default({
         mode: 'optional',
         strategy: 'jwt'

@@ -3,6 +3,7 @@ const FormData = require('form-data');
 
 const Jwt = require('jsonwebtoken');
 const axios = require('axios');
+const Boom = require('@hapi/boom')
 
 const { requestSuggestion } = require('../services/giveSuggestion');
 const { storeDataSQL } = require('../services/storeData');
@@ -104,13 +105,18 @@ async function userLoginHandler(request, h) {
                 // Authenticating credentials
                 if (hashed_password === stored_password) {
                     // Creating a token for the user consist of user id and username
-                    const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
+                    const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' }); 
                     const response = h.response({
                         status: 'Success',
-                        message: 'Logged in successfully.'
+                        message: 'Logged in successfully.',
+                        loginResult: {
+                            userId: userId,
+                            name: username,
+                            token: token
+                        }
                     })
                     // Creating session with the token
-                    response.state('session', { token });
+                    //response.state('session', { token });
                     response.code(200);
                     return response;
                 }
@@ -125,20 +131,25 @@ async function userLoginHandler(request, h) {
         else {
             // Verifying user login credentials with the one from database
             const [rows] = await pool.execute('SELECT * FROM users WHERE username = ?', [emailOrUsername]);
-            if(rows.length > 0) {
+            if (rows.length > 0) {
                 const userId = rows[0].id;
                 const username = rows[0].username;
                 const stored_password = rows[0].hashed_password;
                 // Authenticating credentials
                 if (hashed_password === stored_password) {
                     // Creating a token for the user consist of user id and username
-                    const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
+                    const token = Jwt.sign({ id: userId, username: username }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
                     const response = h.response({
                         status: 'Success',
-                        message: 'Logged in successfully.'
+                        message: 'Logged in successfully.',
+                        loginResult: {
+                            userId: userId,
+                            name: username,
+                            token: token
+                        }
                     })
                     // Creating session with the token
-                    response.state('session', { token });
+                    //response.state('session',  { token });
                     response.code(200);
                     return response;
                 }
@@ -169,7 +180,7 @@ async function userLogoutHandler(request, h) {
             message: 'Logged out successfully.'
         })
         // Clearing session
-        response.unstate('session');
+        //response.unstate('session');
         response.code(200);
         return response;
     }
@@ -183,14 +194,41 @@ async function userLogoutHandler(request, h) {
     }
 }
 
+
+// Getting news articles
+async function getNewsHandler(request, h) {
+    try {
+        // Forward the request to third party server api
+        const news_response = await axios.get('https://newsapi.org/v2/everything?q=gardening+OR+plant_disease+OR+plants+OR+agriculture&pageSize=50&sortBy=relevancy', {
+            headers: {
+                'X-Api-Key': process.env.NEWS_API_KEY
+            }
+        });
+        
+        // Picking up the data receive from third party server api
+        const news_data = news_response.data;
+
+        return news_data;
+    }
+    catch(error) {
+        const response = h.response({
+            status: 'Fail',
+            message: error.message
+        })
+        response.code(500);
+        return response;
+    }
+}
+
+
 // Posting a Prediction
 async function postPredictionHandler(request, h) {
     try {
         const payload = request.payload;
                 
         // Check if 'image' key exists in the payload
-        if (!payload || !payload.image) {
-            throw Boom.badRequest('Image file is required');
+        if (!payload || !payload.image.hapi.filename) {
+            throw Boom.badRequest('Missing image file required');
         }
 
         // Getting image from the request
@@ -236,10 +274,13 @@ async function postPredictionHandler(request, h) {
         // Encode the Buffer as a Base64 string
         const image_encoded = buffer.toString('base64');
         
-        // Getting user credentials through the authentication
-        const  { id } = request.auth.credentials;
+        // Storing prediction result into database
+        if (request.auth.credentials) {
+            // Getting user credentials through the authentication
+            const  { id } = request.auth.credentials;
 
-        await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, image_encoded, mime_type);
+            await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, image_encoded, mime_type);
+        }
 
         const response = h.response({
             status: 'Success',
@@ -254,7 +295,7 @@ async function postPredictionHandler(request, h) {
             status: 'Fail',
             message: error.message
         })
-        response.code(500);
+        response.code(400);
         return response;
     }
 }
@@ -262,9 +303,13 @@ async function postPredictionHandler(request, h) {
 // Getting predictions history
 async function getPredictionHandler(request, h) {
     try {
+        if (!request.auth.credentials) {
+            throw Boom.unauthorized('Missing authenticated credentials')
+        }
+
         const { pool } = request.server.app;
         const { id } = request.auth.credentials;
-        const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ?', [id]);
+        const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? ORDER BY predictions.id DESC', [id]);
         
         const response = h.response({
             status: 'Success',
@@ -278,7 +323,7 @@ async function getPredictionHandler(request, h) {
             status: 'Fail',
             message: error.message
         })
-        response.code(500);
+        response.code(400);
         return response;
     }
 }
@@ -286,6 +331,10 @@ async function getPredictionHandler(request, h) {
 // Deleting prediction history
 async function deletePredictionHandler(request, h) {
     try {
+        if (!request.auth.credentials) {
+            throw Boom.unauthorized('Missing authenticated credentials')
+        }
+
         const { pool } = request.server.app;
         const { predictionId } = request.query;
         const { id } = request.auth.credentials;
@@ -308,7 +357,7 @@ async function deletePredictionHandler(request, h) {
             status: 'Fail',
             message: error.message
         })
-        response.code(500);
+        response.code(400);
         return response;
     }
 }
@@ -317,6 +366,7 @@ module.exports = {
     userRegisterHandler, 
     userLoginHandler, 
     userLogoutHandler, 
+    getNewsHandler,
     postPredictionHandler, 
     getPredictionHandler, 
     deletePredictionHandler, 

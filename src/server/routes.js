@@ -2,9 +2,10 @@ const {
     userRegisterHandler, 
     userLoginHandler, 
     userLogoutHandler, 
+    getNewsHandler,
     postPredictionHandler,
     getPredictionHandler, 
-    deletePredictionHandler
+    deletePredictionHandler,
 } = require('./handler');
 
 const routes = [
@@ -38,6 +39,14 @@ const routes = [
         path: '/logout',
         method: '*',
         handler: userLogoutHandler,
+        options: {
+            auth: false,
+        }
+    },
+    {
+        path: '/news',
+        method: 'GET',
+        handler: getNewsHandler,
         options: {
             auth: false,
         }
