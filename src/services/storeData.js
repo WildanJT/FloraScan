@@ -15,10 +15,16 @@ const pool = mysql.createPool({
     queueLimit: 0,
 });
 
+const serviceAcountKey = JSON.parse(process.env.STORAGE_BUCKET_SA);
+
 const storage = new Storage({
-    //credentials: process.env.STORAGE_BUCKET_SA
-    projectId: process.env.PROJECT_ID,
-    keyFilename: process.env.STORAGE_BUCKET_SA
+    projectID: serviceAcountKey.project_id,
+    credentials: {
+        client_email: serviceAcountKey.client_email,
+        private_key: serviceAcountKey.private_key
+    }
+    //projectId: process.env.PROJECT_ID,
+    //keyFilename: process.env.STORAGE_BUCKET_SA
 });
 
 // Store data into database
