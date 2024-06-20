@@ -1,12 +1,14 @@
 const crypto = require('crypto');
 const FormData = require('form-data');
+const fs = require('fs');
 
 const Jwt = require('jsonwebtoken');
 const axios = require('axios');
-const Boom = require('@hapi/boom')
+const Boom = require('@hapi/boom');
+const path = require('path');
 
 const { requestSuggestion } = require('../services/giveSuggestion');
-const { storeDataSQL, storeImageBucket } = require('../services/storeData');
+const { storeDataSQL, storeImageBucket, deleteImageBucket } = require('../services/storeData');
 
 
 const isValidEmail = (email) => {
@@ -259,30 +261,14 @@ async function postPredictionHandler(request, h) {
             suggestion: await requestSuggestion(predicted_class)
         }
 
-        // Reading the image content
-        const imageBuffer = await new Promise((resolve, reject) => {
-            const chunks = [];
-            image.on('data', chunk => chunks.push(chunk));
-            image.on('end', () => resolve(Buffer.concat(chunks)));
-            image.on('error', err => reject(err));
-        });
-
-        // Convert the binary data to a Buffer
-        const buffer = Buffer.from(imageBuffer, 'binary');
-
-        // Encode the Buffer as a Base64 string
-        const image_encoded = buffer.toString('base64');
-
         // Storing prediction result into database
         if (request.auth.credentials) {
             // Getting user credentials through the authentication
             const  { id } = request.auth.credentials;
 
-            //----Butuh update----//
-            //fungsi buat dapetin url image
-            const image_url = await storeImageBucket(); // ini fungsinya di service/storeData
-
-            await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, image_encoded, mime_type);
+            const {saved_url, saved_name} = await storeImageBucket(image, id, mime_type);
+            
+            await storeDataSQL(id, data.prediction, data.score, filename, mime_type, saved_url, saved_name);
         }
 
         const response = h.response({
@@ -315,7 +301,7 @@ async function getPredictionHandler(request, h) {
         const { predictionId } = request.query;
 
         if (predictionId) {
-            const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? AND predictions.id = ?', [id, predictionId]);
+            const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.mime_type, images.saved_url FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? AND predictions.id = ?', [id, predictionId]);
             if (data.length > 0) {
                 const predicted_class = data[0].prediction_data;
                 const suggestion = await requestSuggestion(predicted_class)
@@ -333,7 +319,7 @@ async function getPredictionHandler(request, h) {
             }
         }
         else {
-            const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? ORDER BY predictions.id DESC', [id]);
+            const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.mime_type, images.saved_url FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? ORDER BY predictions.id DESC', [id]);
             const response = h.response({
                 status: 'Success',
                 predictions: data
@@ -366,6 +352,13 @@ async function deletePredictionHandler(request, h) {
         if (predictionId) {
             const [rows] = await pool.execute('SELECT * FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id])
             if (rows.length > 0) {
+                // Deleting image
+                const [images] = await pool.execute('SELECT saved_name FROM images WHERE user_id = ? AND prediction_id = ?', [id, predictionId])
+                if (images.length > 0) {
+                    const saved_name = images[0].saved_name;
+                    deleteImageBucket(saved_name);
+                }
+                // Deleting prediction
                 await pool.execute('DELETE FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id]);
                 const response = h.response({
                     status: 'Success',
