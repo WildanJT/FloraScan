@@ -6,7 +6,7 @@ const axios = require('axios');
 const Boom = require('@hapi/boom')
 
 const { requestSuggestion } = require('../services/giveSuggestion');
-const { storeDataSQL } = require('../services/storeData');
+const { storeDataSQL, storeImageBucket } = require('../services/storeData');
 
 
 const isValidEmail = (email) => {
@@ -236,7 +236,6 @@ async function postPredictionHandler(request, h) {
         const filename = image.hapi.filename;
         const mime_type = image.hapi.headers['content-type'];
 
-
         // Append the image into request form
         const form = new FormData();
         form.append('image', image._data, {
@@ -273,11 +272,15 @@ async function postPredictionHandler(request, h) {
 
         // Encode the Buffer as a Base64 string
         const image_encoded = buffer.toString('base64');
-        
+
         // Storing prediction result into database
         if (request.auth.credentials) {
             // Getting user credentials through the authentication
             const  { id } = request.auth.credentials;
+
+            //----Butuh update----//
+            //fungsi buat dapetin url image
+            const image_url = await storeImageBucket(); // ini fungsinya di service/storeData
 
             await storeDataSQL(id, data.prediction, data.score, imageBuffer, filename, image_encoded, mime_type);
         }
@@ -309,14 +312,35 @@ async function getPredictionHandler(request, h) {
 
         const { pool } = request.server.app;
         const { id } = request.auth.credentials;
-        const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? ORDER BY predictions.id DESC', [id]);
-        
-        const response = h.response({
-            status: 'Success',
-            predictions: data
-        })
-        response.code(200);
-        return response;
+        const { predictionId } = request.query;
+
+        if (predictionId) {
+            const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? AND predictions.id = ?', [id, predictionId]);
+            if (data.length > 0) {
+                const predicted_class = data[0].prediction_data;
+                const suggestion = await requestSuggestion(predicted_class)
+                
+                const response = h.response({
+                    status: 'Success',
+                    predictions: data,
+                    suggestion: suggestion
+                })
+                response.code(200);
+                return response;
+            }
+            else {
+                return h.response({ status: 'Fail', message: 'Couldn\'t find prediction data.' }).code(400);
+            }
+        }
+        else {
+            const [data] = await pool.execute('SELECT predictions.id, predictions.prediction_data, predictions.prediction_score, predictions.timestamp, images.file_name, images.image_encoded, images.mime_type FROM predictions JOIN images ON predictions.id = images.prediction_id WHERE predictions.user_id = ? ORDER BY predictions.id DESC', [id]);
+            const response = h.response({
+                status: 'Success',
+                predictions: data
+            })
+            response.code(200);
+            return response;
+        }
     }
     catch(error) {
         const response = h.response({
@@ -336,20 +360,26 @@ async function deletePredictionHandler(request, h) {
         }
 
         const { pool } = request.server.app;
-        const { predictionId } = request.query;
         const { id } = request.auth.credentials;
-        const [rows] = await pool.execute('SELECT * FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id])
-        if (rows.length > 0) {
-            await pool.execute('DELETE FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id]);
-            const response = h.response({
-                status: 'Success',
-                message: 'Prediction deleted.'
-            })
-            response.code(200);
-            return response;
+        const { predictionId } = request.query;
+
+        if (predictionId) {
+            const [rows] = await pool.execute('SELECT * FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id])
+            if (rows.length > 0) {
+                await pool.execute('DELETE FROM predictions WHERE id = ? AND user_id = ?', [predictionId, id]);
+                const response = h.response({
+                    status: 'Success',
+                    message: 'Prediction deleted.'
+                })
+                response.code(200);
+                return response;
+            }
+            else {
+                return h.response({ status: 'Fail', message: 'Couldn\'t find prediction data.' }).code(400);
+            }
         }
-        else {
-            return h.response({ status: 'Fail', message: 'Couldn\'t find prediction.' }).code(400);
+        else{
+            return h.response({ status: 'Fail', message: 'No predictionId provided in the query.' }).code(400);
         }
     }
     catch(error) {
